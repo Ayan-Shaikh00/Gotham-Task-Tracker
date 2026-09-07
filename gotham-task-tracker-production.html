@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="A focused daily task tracker with streaks and a yearly completion heatmap.">
+<title>Gotham Task Tracker</title>
+
+<style>
+  :root {
+    font-family: "Trebuchet MS", "Helvetica Neue", Arial, sans-serif;
+    color-scheme: light dark;
+  }
+
+  body[data-theme="light"] {
+    --bg:#f4f5f7; --bg-card:#fff; --line:#e2e4e9; --ink:#1b1e24;
+    --ink-soft:#6b7280; --bat-yellow:#9a7008; --bat-yellow-dim:#c39428;
+    --bat-yellow-bg:#f2c14e; --lvl0:#e8eaee; --lvl1:#bfe4c6;
+    --lvl2:#74c98a; --lvl3:#2e9e4f; --lvl4:#1c7a39;
+    --track:#eef0f3; --thumb:#c7cbd3; --danger:#d1483d;
+    --focus:#8a6400; --shadow:0 12px 28px rgba(20,22,30,.06);
+  }
+
+  body[data-theme="dark"] {
+    --bg:#0a0c10; --bg-card:#12151b; --line:#2a2f38; --ink:#eef0f2;
+    --ink-soft:#8a919c; --bat-yellow:#f2c14e; --bat-yellow-dim:#c99f34;
+    --bat-yellow-bg:#f2c14e; --lvl0:#1b1f27; --lvl1:#274a2e;
+    --lvl2:#2e7d3d; --lvl3:#39a84c; --lvl4:#4fe066;
+    --track:#1b1f27; --thumb:#3a4150; --danger:#ff766c;
+    --focus:#f2c14e; --shadow:0 12px 28px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing:border-box; }
+
+  html { min-width:320px; }
+
+  body {
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -10%,
+        color-mix(in srgb, var(--bat-yellow-bg) 10%, transparent), transparent 60%),
+      var(--bg);
+    color:var(--ink);
+    padding:44px 24px 40px;
+    -webkit-font-smoothing:antialiased;
+    transition:background .2s,color .2s;
+  }
+
+  button,input { font:inherit; }
+  button { -webkit-tap-highlight-color:transparent; }
+
+  .wrap { max-width:900px; margin:0 auto; position:relative; }
+
+  .mode-toggle {
+    position:absolute; top:0; right:0;
+    display:flex; align-items:center; gap:6px;
+    background:var(--bg-card); border:1px solid var(--line);
+    border-radius:999px; padding:4px;
+  }
+
+  .mode-toggle button {
+    border:0; background:transparent; color:var(--ink-soft);
+    font-size:12px; font-weight:700; letter-spacing:.03em;
+    text-transform:uppercase; padding:6px 12px; border-radius:999px;
+    cursor:pointer; transition:background .15s,color .15s;
+  }
+
+  .mode-toggle button:hover { color:var(--ink); }
+  .mode-toggle button.active { background:var(--bat-yellow-bg); color:#14120a; }
+
+  .bat-mark { width:34px; margin:0 auto 14px; display:block; opacity:.9; }
+  .bat-mark path { fill:var(--bat-yellow); }
+
+  h1 {
+    font-size:clamp(24px,5vw,30px); font-weight:800; letter-spacing:.04em;
+    text-transform:uppercase; text-align:center; margin:0 0 4px;
+  }
+
+  h1 span { color:var(--bat-yellow); }
+
+  .sub {
+    color:var(--ink-soft); font-size:13.5px; text-align:center;
+    margin:0 0 34px; letter-spacing:.02em;
+  }
+
+  .today-card,.heat-card {
+    background:var(--bg-card); border:1px solid var(--line);
+    border-radius:10px; box-shadow:var(--shadow);
+  }
+
+  .today-card { padding:22px 24px; margin-bottom:28px; }
+
+  .today-head {
+    display:flex; align-items:baseline; justify-content:space-between;
+    gap:16px; margin-bottom:14px; border-bottom:1px solid var(--line);
+    padding-bottom:12px;
+  }
+
+  .today-date {
+    font-size:12.5px; letter-spacing:.04em; text-transform:uppercase;
+    color:var(--ink-soft);
+  }
+
+  .streak {
+    font-size:13px; color:var(--bat-yellow); font-weight:700;
+    letter-spacing:.02em; white-space:nowrap;
+  }
+
+  .add-row { display:flex; gap:8px; margin-bottom:14px; }
+
+  .add-row input {
+    min-width:0; flex:1; font-size:14px; padding:10px 12px;
+    border:1px solid var(--line); border-radius:7px;
+    background:var(--bg); color:var(--ink);
+  }
+
+  .add-row input::placeholder { color:var(--ink-soft); }
+  .add-row input:focus-visible,
+  button:focus-visible {
+    outline:2px solid var(--focus); outline-offset:2px;
+  }
+
+  .add-row button {
+    font-size:13px; font-weight:700; letter-spacing:.04em;
+    text-transform:uppercase; padding:10px 18px;
+    border:1px solid var(--bat-yellow-dim); border-radius:7px;
+    background:var(--bat-yellow-bg); color:#14120a; cursor:pointer;
+    transition:filter .15s,transform .05s;
+  }
+
+  .add-row button:hover { filter:brightness(1.06); }
+  .add-row button:active { transform:scale(.97); }
+
+  .task-list { list-style:none; margin:0; padding:0; }
+  .task-list li {
+    display:flex; align-items:center; gap:10px; padding:9px 2px;
+    border-bottom:1px solid var(--line); font-size:14.5px;
+  }
+  .task-list li:last-child { border-bottom:0; }
+
+  .check {
+    width:19px; height:19px; border-radius:5px;
+    border:1.5px solid var(--ink-soft); flex:none; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--bg); transition:background .15s,border-color .15s;
+  }
+
+  .check:hover { border-color:var(--bat-yellow); }
+  .check.done { background:var(--lvl3); border-color:var(--lvl3); }
+
+  .check.done::after {
+    content:""; width:5px; height:9px;
+    border-right:2px solid var(--bg-card);
+    border-bottom:2px solid var(--bg-card);
+    transform:rotate(45deg) translate(-1px,-1px);
+  }
+
+  .task-text { flex:1; color:var(--ink); overflow-wrap:anywhere; }
+  .task-text.done { color:var(--ink-soft); text-decoration:line-through; }
+
+  .remove {
+    color:var(--ink-soft); background:none; border:0; cursor:pointer;
+    font-size:17px; padding:5px 7px; line-height:1; border-radius:5px;
+  }
+  .remove:hover { color:var(--danger); background:color-mix(in srgb,var(--danger) 8%,transparent); }
+
+  .empty-note { font-size:13.5px; color:var(--ink-soft); padding:6px 2px; }
+
+  .heat-card { padding:24px; }
+  .heat-title {
+    font-size:12.5px; letter-spacing:.02em; color:var(--ink-soft);
+    margin-bottom:16px;
+  }
+  .heat-title strong { color:var(--bat-yellow); font-weight:800; }
+
+  .grid-scroll {
+    overflow-x:auto; padding-bottom:10px; scrollbar-width:thin;
+    scrollbar-color:var(--thumb) var(--track);
+  }
+
+  .grid-scroll::-webkit-scrollbar { height:6px; }
+  .grid-scroll::-webkit-scrollbar-track { background:var(--track); border-radius:99px; }
+  .grid-scroll::-webkit-scrollbar-thumb { background:var(--thumb); border-radius:99px; }
+  .grid-scroll::-webkit-scrollbar-thumb:hover { background:var(--bat-yellow-dim); }
+
+  .grid-inner { display:flex; gap:10px; width:max-content; }
+  .month-labels {
+    display:grid; grid-auto-flow:column; font-size:11px;
+    color:var(--ink-soft); margin-bottom:4px; height:14px;
+  }
+
+  .weekday-labels {
+    display:grid; grid-template-rows:repeat(7,13px); gap:3px;
+    font-size:10px; color:var(--ink-soft); margin-top:18px; margin-right:2px;
+  }
+
+  .weeks { display:grid; grid-auto-flow:column; gap:3px; }
+  .week { display:grid; grid-template-rows:repeat(7,13px); gap:3px; }
+
+  .day {
+    width:13px; height:13px; border-radius:3px;
+    background:var(--lvl0); cursor:default;
+  }
+  .day[data-lvl="1"] { background:var(--lvl1); }
+  .day[data-lvl="2"] { background:var(--lvl2); }
+  .day[data-lvl="3"] { background:var(--lvl3); }
+  .day[data-lvl="4"] { background:var(--lvl4); }
+  .day.today { box-shadow:0 0 0 1.5px var(--bat-yellow); }
+  .day.future { background:transparent; }
+
+  .legend {
+    display:flex; align-items:center; gap:6px; margin-top:16px;
+    font-size:11px; color:var(--ink-soft);
+  }
+  .legend .day { width:11px; height:11px; }
+
+  .tooltip {
+    position:fixed; max-width:min(280px,calc(100vw - 24px));
+    background:var(--bg-card); border:1px solid var(--bat-yellow-dim);
+    color:var(--ink); font-size:12px; padding:6px 9px; border-radius:6px;
+    pointer-events:none; opacity:0; z-index:10; white-space:nowrap;
+    transition:opacity .1s; box-shadow:var(--shadow);
+  }
+
+  .status {
+    min-height:18px; margin:0 0 8px; font-size:12px; color:var(--danger);
+  }
+
+  .watermark {
+    text-align:center; margin-top:28px; font-size:11.5px;
+    letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-soft); opacity:.65;
+  }
+
+  @media (max-width:600px) {
+    body { padding:24px 14px 30px; }
+    .mode-toggle { position:static; width:max-content; margin:0 0 24px auto; }
+    .today-card,.heat-card { padding:18px; }
+    .today-head { align-items:flex-start; flex-direction:column; gap:5px; }
+    .add-row button { padding-inline:14px; }
+  }
+
+  @media (prefers-reduced-motion:reduce) {
+    *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; }
+  }
+</style>
+</head>
+
+<body data-theme="light">
+<div class="wrap">
+  <div class="mode-toggle" aria-label="Color theme">
+    <button id="lightBtn" type="button" aria-pressed="true">Light</button>
+    <button id="darkBtn" type="button" aria-pressed="false">Dark</button>
+  </div>
+
+  <svg class="bat-mark" viewBox="0 0 100 50" fill="none" aria-hidden="true">
+    <path d="M50 4C46 10 40 8 36 12C39 9 32 9 28 14C31 12 25 13 21 19C25 16 19 20 16 27C21 22 15 30 15 36C21 27 24 33 27 30C25 34 30 30 32 26C31 32 36 27 37 23C38 29 41 22 42 19C44 25 45 20 46 17C47 22 50 22 50 22C50 22 53 22 54 17C55 20 56 25 58 19C59 22 62 29 63 23C64 27 69 32 68 26C70 30 75 34 73 30C76 33 79 27 85 36C85 30 79 22 84 27C81 20 75 16 79 19C75 13 69 12 72 14C68 9 61 9 64 12C60 8 54 10 50 4Z"/>
+  </svg>
+
+  <h1>Gotham <span>Task</span> Tracker</h1>
+  <p class="sub">Every night has a job to finish. Mark it done — the city keeps score.</p>
+
+  <main>
+    <section class="today-card" aria-labelledby="todayHeading">
+      <div class="today-head">
+        <div class="today-date" id="todayDate" aria-label="Today's date"></div>
+        <div class="streak" id="streakLabel" aria-live="polite"></div>
+      </div>
+
+      <h2 id="todayHeading" class="visually-hidden" style="position:absolute;left:-10000px;">Today's tasks</h2>
+
+      <form class="add-row" id="taskForm" novalidate>
+        <label for="taskInput" class="visually-hidden" style="position:absolute;left:-10000px;">Task name</label>
+        <input type="text" id="taskInput" placeholder="Add tonight's task…" maxlength="140"
+               autocomplete="off" required>
+        <button id="addBtn" type="submit">Add</button>
+      </form>
+
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+      <ul class="task-list" id="taskList" aria-label="Today's task list"></ul>
+      <div class="empty-note" id="emptyNote" hidden>No cases open — add your first task above.</div>
+    </section>
+
+    <section class="heat-card" aria-labelledby="heatHeading">
+      <div class="heat-title" id="heatHeading">
+        <strong id="totalDone">0</strong> tasks completed in the last year
+      </div>
+
+      <div class="grid-scroll" tabindex="0" aria-label="Yearly task completion heatmap">
+        <div class="grid-inner">
+          <div>
+            <div class="month-labels" id="monthLabels"></div>
+            <div style="display:flex;">
+              <div class="weekday-labels" id="weekdayLabels" aria-hidden="true"></div>
+              <div class="weeks" id="weeks"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend" aria-label="Completion intensity legend">
+        <span>Less</span>
+        <div class="day" data-lvl="0" aria-hidden="true"></div>
+        <div class="day" data-lvl="1" aria-hidden="true"></div>
+        <div class="day" data-lvl="2" aria-hidden="true"></div>
+        <div class="day" data-lvl="3" aria-hidden="true"></div>
+        <div class="day" data-lvl="4" aria-hidden="true"></div>
+        <span>More</span>
+      </div>
+    </section>
+  </main>
+
+  <div class="watermark">Created by Ayten</div>
+</div>
+
+<div class="tooltip" id="tooltip" role="tooltip" aria-hidden="true"></div>
+
+<script>
+"use strict";
+
+(() => {
+  const STORAGE_KEY = "gotham-task-log-v2";
+  const LEGACY_STORAGE_KEY = "gotham-task-log-v1";
+  const THEME_KEY = "gotham-theme-v2";
+  const MAX_TASK_LENGTH = 140;
+  const DAYS_IN_YEAR_VIEW = 365;
+
+  const $ = (selector) => document.querySelector(selector);
+
+  const els = {
+    lightBtn: $("#lightBtn"),
+    darkBtn: $("#darkBtn"),
+    taskForm: $("#taskForm"),
+    taskInput: $("#taskInput"),
+    taskList: $("#taskList"),
+    emptyNote: $("#emptyNote"),
+    todayDate: $("#todayDate"),
+    streakLabel: $("#streakLabel"),
+    totalDone: $("#totalDone"),
+    weeks: $("#weeks"),
+    monthLabels: $("#monthLabels"),
+    weekdayLabels: $("#weekdayLabels"),
+    tooltip: $("#tooltip"),
+    status: $("#status")
+  };
+
+  let log = Object.create(null);
+  let saveTimer = null;
+
+  function dateKey(date = new Date()) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function startOfDay(date = new Date()) {
+    const result = new Date(date);
+    result.setHours(0, 0, 0, 0);
+    return result;
+  }
+
+  function escapeStoragePayload(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return Object.create(null);
+    }
+
+    const clean = Object.create(null);
+
+    for (const [key, tasks] of Object.entries(value)) {
+      if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(key) || !Array.isArray(tasks)) continue;
+
+      const validTasks = tasks
+        .filter(task =>
+          task &&
+          typeof task.id === "string" &&
+          typeof task.text === "string" &&
+          typeof task.done === "boolean"
+        )
+        .map(task => ({
+          id: task.id.slice(0, 100),
+          text: task.text.trim().slice(0, MAX_TASK_LENGTH),
+          done: task.done
+        }))
+        .filter(task => task.text.length > 0);
+
+      if (validTasks.length) clean[key] = validTasks;
+    }
+
+    return clean;
+  }
+
+  function readStorage(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (error) {
+      console.error("Storage read failed:", error);
+      return null;
+    }
+  }
+
+  function writeStorage(key, value) {
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch (error) {
+      console.error("Storage write failed:", error);
+      showStatus("Could not save changes. Browser storage may be unavailable.");
+      return false;
+    }
+  }
+
+  function saveLog() {
+    clearTimeout(saveTimer);
+
+    // Debounce writes so a burst of state changes does not hammer storage.
+    saveTimer = setTimeout(() => {
+      writeStorage(STORAGE_KEY, JSON.stringify(log));
+    }, 100);
+  }
+
+  function loadLog() {
+    let stored = readStorage(STORAGE_KEY);
+
+    // One-time migration from the original window.storage implementation.
+    if (!stored) {
+      const legacy = readStorage(LEGACY_STORAGE_KEY);
+      if (legacy) {
+        stored = legacy;
+        writeStorage(STORAGE_KEY, JSON.stringify(escapeStoragePayload(legacy)));
+      }
+    }
+
+    log = escapeStoragePayload(stored);
+  }
+
+  function loadTheme() {
+    const stored = readStorage(THEME_KEY);
+    return stored === "dark" || stored === "light" ? stored : "light";
+  }
+
+  function saveTheme(theme) {
+    writeStorage(THEME_KEY, JSON.stringify(theme));
+  }
+
+  function showStatus(message = "") {
+    els.status.textContent = message;
+    if (message) {
+      clearTimeout(showStatus.timer);
+      showStatus.timer = setTimeout(() => {
+        els.status.textContent = "";
+      }, 3500);
+    }
+  }
+
+  function setTheme(theme, persist = true) {
+    const safeTheme = theme === "dark" ? "dark" : "light";
+    document.body.dataset.theme = safeTheme;
+
+    const isLight = safeTheme === "light";
+    els.lightBtn.classList.toggle("active", isLight);
+    els.darkBtn.classList.toggle("active", !isLight);
+    els.lightBtn.setAttribute("aria-pressed", String(isLight));
+    els.darkBtn.setAttribute("aria-pressed", String(!isLight));
+
+    if (persist) saveTheme(safeTheme);
+  }
+
+  function getTasks(key = dateKey()) {
+    return Array.isArray(log[key]) ? log[key] : [];
+  }
+
+  function completedCount(key) {
+    return getTasks(key).reduce((total, task) => total + (task.done ? 1 : 0), 0);
+  }
+
+  function levelFor(count) {
+    if (count <= 0) return 0;
+    if (count === 1) return 1;
+    if (count === 2) return 2;
+    if (count <= 4) return 3;
+    return 4;
+  }
+
+  function createId() {
+    if (crypto && typeof crypto.randomUUID === "function") {
+      return crypto.randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function addTask() {
+    const text = els.taskInput.value.trim();
+
+    if (!text) {
+      showStatus("Enter a task first.");
+      els.taskInput.focus();
+      return;
+    }
+
+    if (text.length > MAX_TASK_LENGTH) {
+      showStatus(`Task must be ${MAX_TASK_LENGTH} characters or fewer.`);
+      return;
+    }
+
+    const key = dateKey();
+    if (!log[key]) log[key] = [];
+
+    log[key].push({
+      id: createId(),
+      text,
+      done: false
+    });
+
+    els.taskInput.value = "";
+    saveLog();
+    renderToday();
+    renderHeatmap();
+    els.taskInput.focus();
+  }
+
+  function toggleTask(key, id) {
+    const task = getTasks(key).find(item => item.id === id);
+    if (!task) return;
+
+    task.done = !task.done;
+    saveLog();
+    renderToday();
+    renderHeatmap();
+  }
+
+  function removeTask(key, id) {
+    const tasks = getTasks(key);
+    const next = tasks.filter(task => task.id !== id);
+
+    if (next.length) {
+      log[key] = next;
+    } else {
+      delete log[key];
+    }
+
+    saveLog();
+    renderToday();
+    renderHeatmap();
+  }
+
+  function renderToday() {
+    const key = dateKey();
+    const tasks = getTasks(key);
+
+    els.taskList.replaceChildren();
+    els.emptyNote.hidden = tasks.length !== 0;
+
+    for (const task of tasks) {
+      const li = document.createElement("li");
+
+      const check = document.createElement("button");
+      check.type = "button";
+      check.className = `check${task.done ? " done" : ""}`;
+      check.setAttribute("aria-label", task.done ? `Mark "${task.text}" incomplete` : `Mark "${task.text}" complete`);
+      check.setAttribute("aria-pressed", String(task.done));
+      check.addEventListener("click", () => toggleTask(key, task.id));
+
+      const span = document.createElement("span");
+      span.className = `task-text${task.done ? " done" : ""}`;
+      span.textContent = task.text;
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "remove";
+      remove.textContent = "×";
+      remove.title = "Remove task";
+      remove.setAttribute("aria-label", `Remove "${task.text}"`);
+      remove.addEventListener("click", () => removeTask(key, task.id));
+
+      li.append(check, span, remove);
+      els.taskList.appendChild(li);
+    }
+
+    els.todayDate.textContent = new Date().toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    });
+
+    els.streakLabel.textContent = streakText();
+  }
+
+  function streakText() {
+    let date = startOfDay();
+    let streak = 0;
+
+    if (completedCount(dateKey(date)) === 0) {
+      date.setDate(date.getDate() - 1);
+    }
+
+    while (completedCount(dateKey(date)) > 0) {
+      streak++;
+      date.setDate(date.getDate() - 1);
+    }
+
+    return streak ? `${streak} night${streak === 1 ? "" : "s"} streak` : "";
+  }
+
+  function hideTooltip() {
+    els.tooltip.style.opacity = "0";
+    els.tooltip.setAttribute("aria-hidden", "true");
+  }
+
+  function showTooltip(event, text) {
+    els.tooltip.textContent = text;
+    els.tooltip.style.opacity = "1";
+    els.tooltip.setAttribute("aria-hidden", "false");
+
+    const padding = 12;
+    const rect = els.tooltip.getBoundingClientRect();
+    const left = Math.min(event.clientX + 12, window.innerWidth - rect.width - padding);
+    const top = Math.max(padding, event.clientY - rect.height - 10);
+
+    els.tooltip.style.left = `${Math.max(padding, left)}px`;
+    els.tooltip.style.top = `${top}px`;
+  }
+
+  function renderHeatmap() {
+    els.weeks.replaceChildren();
+    els.monthLabels.replaceChildren();
+    els.weekdayLabels.replaceChildren();
+
+    ["", "Mon", "", "Wed", "", "Fri", ""].forEach(label => {
+      const item = document.createElement("div");
+      item.textContent = label;
+      els.weekdayLabels.appendChild(item);
+    });
+
+    const today = startOfDay();
+    const todayKeyValue = dateKey(today);
+
+    const start = new Date(today);
+    start.setDate(start.getDate() - (DAYS_IN_YEAR_VIEW - 1));
+
+    // Align to Sunday so each column is a complete week.
+    start.setDate(start.getDate() - start.getDay());
+
+    const end = new Date(today);
+    const totalDays = Math.floor((end - start) / 86400000) + 1;
+    const totalWeeks = Math.ceil(totalDays / 7);
+
+    let totalDone = 0;
+    let lastMonth = -1;
+    const monthColStarts = [];
+
+    const cursor = new Date(start);
+
+    for (let weekIndex = 0; weekIndex < totalWeeks; weekIndex++) {
+      const weekEl = document.createElement("div");
+      weekEl.className = "week";
+
+      if (cursor.getMonth() !== lastMonth) {
+        monthColStarts.push({ month: cursor.getMonth(), col: weekIndex });
+        lastMonth = cursor.getMonth();
+      }
+
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const cellDate = new Date(cursor);
+        const key = dateKey(cellDate);
+        const dayEl = document.createElement("div");
+
+        if (cellDate > today) {
+          dayEl.className = "day future";
+          dayEl.setAttribute("aria-hidden", "true");
+        } else {
+          const count = completedCount(key);
+          totalDone += count;
+
+          dayEl.className = `day${key === todayKeyValue ? " today" : ""}`;
+          dayEl.dataset.lvl = String(levelFor(count));
+          dayEl.setAttribute("role", "img");
+
+          const formattedDate = cellDate.toLocaleDateString(undefined, {
+            month: "short", day: "numeric", year: "numeric"
+          });
+
+          dayEl.setAttribute(
+            "aria-label",
+            `${formattedDate}: ${count} task${count === 1 ? "" : "s"} completed`
+          );
+
+          const label = count === 0
+            ? `No tasks completed — ${formattedDate}`
+            : `${count} task${count === 1 ? "" : "s"} completed — ${formattedDate}`;
+
+          dayEl.addEventListener("mouseenter", event => showTooltip(event, label));
+          dayEl.addEventListener("mousemove", event => showTooltip(event, label));
+          dayEl.addEventListener("mouseleave", hideTooltip);
+          dayEl.addEventListener("focus", event => {
+            showTooltip(event, label);
+          });
+          dayEl.addEventListener("blur", hideTooltip);
+          dayEl.tabIndex = 0;
+        }
+
+        weekEl.appendChild(dayEl);
+        cursor.setDate(cursor.getDate() + 1);
+      }
+
+      els.weeks.appendChild(weekEl);
+    }
+
+    els.monthLabels.style.gridTemplateColumns = `repeat(${totalWeeks}, 16px)`;
+
+    for (const { month, col } of monthColStarts) {
+      const label = document.createElement("div");
+      label.textContent = new Intl.DateTimeFormat(undefined, { month: "short" }).format(
+        new Date(2020, month, 1)
+      );
+      label.style.gridColumn = String(col + 1);
+      els.monthLabels.appendChild(label);
+    }
+
+    els.totalDone.textContent = String(totalDone);
+  }
+
+  function init() {
+    loadLog();
+    setTheme(loadTheme(), false);
+    renderToday();
+    renderHeatmap();
+
+    els.lightBtn.addEventListener("click", () => setTheme("light"));
+    els.darkBtn.addEventListener("click", () => setTheme("dark"));
+
+    els.taskForm.addEventListener("submit", event => {
+      event.preventDefault();
+      addTask();
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") hideTooltip();
+    });
+
+    window.addEventListener("resize", hideTooltip);
+    window.addEventListener("beforeunload", () => {
+      clearTimeout(saveTimer);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+      } catch (error) {
+        console.error("Final save failed:", error);
+      }
+    });
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
